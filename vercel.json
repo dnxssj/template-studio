@@ -1,6 +1,20 @@
 {
   "rewrites": [
-    { "source": "/template-studio", "destination": "/index.html" },
-    { "source": "/template-studio/(.*)", "destination": "/index.html" }
+    {
+      "source": "/template-studio",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/template-studio/",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/template-studio/assets/(.*)",
+      "destination": "/assets/$1"
+    },
+    {
+      "source": "/template-studio/(.*)",
+      "destination": "/index.html"
+    }
   ]
 }
