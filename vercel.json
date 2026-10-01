@@ -1,0 +1,6 @@
+{
+  "rewrites": [
+    { "source": "/template-studio", "destination": "/index.html" },
+    { "source": "/template-studio/(.*)", "destination": "/index.html" }
+  ]
+}
