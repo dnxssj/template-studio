@@ -20,15 +20,471 @@ const md = (y, m) => new Date(y, m + 1, 0).getDate();
 const off = (y, m, w) => { let d = new Date(y, m, 1).getDay(); return w === "sunday" ? d : (d + 6) % 7 };
 const rgb = h => { h = h.replace("#", ""); return [parseInt(h.slice(0, 2), 16), parseInt(h.slice(2, 4), 16), parseInt(h.slice(4, 6), 16)] };
 
-function PDFText(p, s, x, y, z = 10, c = [40, 40, 40], b = false, a = "left") { p.setFont("helvetica", b ? "bold" : "normal"); p.setFontSize(z); p.setTextColor(...c); p.text(s, x, y, { align: a }) }
-function brand(p, w, h) { PDFText(p, "dienix", w - 10, h - 7, 7, [125, 125, 125], false, "right") }
-function paper(p, w, h, s, c) { p.setFillColor(...rgb(c)); p.rect(0, 0, w, h, "F"); p.setDrawColor(220); p.setLineWidth(.15); if (s === "ruled" || s === "grid") for (let y = 25; y < h - 15; y += 7)p.line(13, y, w - 13, y); if (s === "grid") for (let x = 13; x < w - 13; x += 7)p.line(x, 20, x, h - 15); if (s === "dotted") { p.setFillColor(185); for (let y = 22; y < h - 15; y += 6)for (let x = 14; x < w - 13; x += 6)p.circle(x, y, .3, "F") } }
-function elementsPDF(p, es) { es.forEach(e => { let x = e.x, y = e.y, w = e.w, h = e.h, c = rgb(e.color); p.setDrawColor(...c); p.setTextColor(...c); if (e.type === "text") PDFText(p, e.content, x, y + 5, e.size, c, e.bold); if (e.type === "check") { p.rect(x, y, 5, 5); PDFText(p, e.content, x + 8, y + 4, 8, c) } if (e.type === "line") p.line(x, y, x + w, y); if (e.type === "box") p.roundedRect(x, y, w, h, 2, 2); if (e.type === "icon") { p.circle(x + 4, y + 4, 3); PDFText(p, "★", x + 4, y + 6, 6, c, true, "center") } }) }
+function PDFText(p, s, x, y, z = 10, c = [40, 40, 40], b = false, a = "left") {
+  p.setFont("helvetica", b ? "bold" : "normal");
+  p.setFontSize(z);
+  p.setTextColor(...c);
+  p.text(String(s), x, y, { align: a });
+}
 
-function exportNotebook(c) { let [bw, bh] = sizes[c.size], land = c.orientation === "landscape", w = land ? bh : bw, h = land ? bw : bh, p = new jsPDF({ unit: "mm", format: [w, h], orientation: land ? "landscape" : "portrait" }); let total = 2 + c.sections.reduce((n, s) => n + s[1], 0); p.setFillColor(250, 237, 244); p.rect(0, 0, w, h, "F"); PDFText(p, c.name.toUpperCase(), 14, h / 2, 25, [35, 35, 35], true); PDFText(p, "A linked digital notebook for Goodnotes", 15, h / 2 + 12, 9, [100, 100, 100]); brand(p, w, h); p.addPage([w, h]); PDFText(p, "INDEX", 14, 22, 21, [35, 35, 35], true); let y = 42, target = 3; c.sections.forEach((s, i) => { p.setFillColor(...rgb(c.accent)); p.roundedRect(14, y - 6, w - 28, 11, 2, 2, "F"); PDFText(p, `${i + 1}. ${s[0]}`, 20, y + 1, 9, [255, 255, 255], true); p.link(14, y - 6, w - 28, 11, { pageNumber: target }); y += 17; target += s[1] }); brand(p, w, h); let pg = 3; c.sections.forEach((s, i) => { for (let n = 0; n < s[1]; n++) { p.addPage([w, h]); paper(p, w, h, c.style, c.paper); p.setFillColor(...rgb(c.accent)); p.rect(0, 0, w, 3, "F"); PDFText(p, s[0], 14, 17, 11, [55, 55, 55], true); if (c.tabs) { let th = 14, ty = 22 + i * th; p.setFillColor(...rgb(c.accent)); p.roundedRect(w - 12, ty, 9, 12, 1, 1, "F"); PDFText(p, String(i + 1), w - 7.5, ty + 8, 5, [255, 255, 255], true, "center"); p.link(w - 13, ty, 11, 12, { pageNumber: 3 + c.sections.slice(0, i).reduce((a, x) => a + x[1], 0) }) } elementsPDF(p, c.elements); if (c.numbers) PDFText(p, String(pg), w / 2, h - 7, 6, [120, 120, 120], false, "center"); p.link(10, h - 14, 25, 8, { pageNumber: 2 }); if (pg > 3) p.link(w / 2 - 18, h - 14, 14, 8, { pageNumber: pg - 1 }); if (pg < total) p.link(w / 2 + 4, h - 14, 14, 8, { pageNumber: pg + 1 }); brand(p, w, h); pg++ } }); p.save(c.name.replaceAll(" ", "-") + ".pdf") }
-function exportAnnual(c) { let [bw, bh] = sizes[c.size], land = c.orientation === "landscape", w = land ? bh : bw, h = land ? bw : bh, p = new jsPDF({ unit: "mm", format: [w, h], orientation: land ? "landscape" : "portrait" }); PDFText(p, String(c.year), 14, h / 2, 34, [35, 35, 35], true); PDFText(p, "ANNUAL PLANNER", 16, h / 2 + 13, 12, [90, 90, 90], true); brand(p, w, h); p.addPage([w, h]); PDFText(p, `${c.year} OVERVIEW`, 14, 22, 20, [35, 35, 35], true); let cw = (w - 35) / 3, ch = (h - 55) / 4; for (let m = 0; m < 12; m++) { let x = 14 + (m % 3) * cw, y = 34 + Math.floor(m / 3) * ch; p.setFillColor(252, 245, 248); p.roundedRect(x, y, cw - 6, ch - 6, 2, 2, "F"); PDFText(p, mn(c.year, m).toUpperCase(), x + 4, y + 9, 8, [55, 55, 55], true); p.link(x, y, cw - 6, ch - 6, { pageNumber: m + 3 }) } brand(p, w, h); for (let m = 0; m < 12; m++) { p.addPage([w, h]); PDFText(p, mn(c.year, m).toUpperCase(), 14, 20, 20, [40, 40, 40], true); let gx = 12, gy = 29, gw = w - 24, gh = h - 48, cw2 = gw / 7, ch2 = (gh - 8) / 6; let ls = c.week === "sunday" ? ["SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"] : ["MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"]; p.setFillColor(246, 239, 243); p.rect(gx, gy, gw, 8, "F"); p.setDrawColor(205); for (let x = 0; x <= 7; x++)p.line(gx + x * cw2, gy, gx + x * cw2, gy + gh); for (let r = 0; r <= 7; r++)p.line(gx, gy + 8 + r * ch2, gx + gw, gy + 8 + r * ch2); ls.forEach((d, i) => PDFText(p, d, gx + i * cw2 + cw2 / 2, gy + 5, 6, [100, 100, 100], true, "center")); let o = off(c.year, m, c.week), days = md(c.year, m); for (let d = 1; d <= days; d++) { let q = o + d - 1, x = gx + (q % 7) * cw2, y = gy + 8 + Math.floor(q / 7) * ch2; PDFText(p, String(d), x + 3, y + 6, 7, [65, 65, 65], true) } if (c.notes) { p.setDrawColor(...rgb(c.accent)); p.roundedRect(12, h - 15, gw, 7, 2, 2); PDFText(p, "NOTES", 16, h - 10, 5, [100, 80, 90], true) } p.link(10, h - 14, 25, 8, { pageNumber: 2 }); if (m > 0) p.link(w / 2 - 18, h - 14, 14, 8, { pageNumber: m + 2 }); if (m < 11) p.link(w / 2 + 4, h - 14, 14, 8, { pageNumber: m + 4 }); brand(p, w, h) } p.save(c.name.replaceAll(" ", "-") + "-" + c.year + ".pdf") }
-function exportTasks(c) { let [bw, bh] = sizes[c.size], land = c.orientation === "landscape", w = land ? bh : bw, h = land ? bw : bh, p = new jsPDF({ unit: "mm", format: [w, h], orientation: land ? "landscape" : "portrait" }); paper(p, w, h, "blank", c.paper); PDFText(p, c.name, 15, 22, 22, [40, 40, 40], true); PDFText(p, "TASK LIST", 15, 30, 8, [120, 120, 120]); let y = 44; for (let i = 0; i < c.rows; i++) { p.rect(15, y, 6, 6); p.line(25, y + 6, w - 15, y + 6); if (c.priority) p.circle(w - 20, y + 3, 2); y += 12 } elementsPDF(p, c.elements); brand(p, w, h); p.save(c.name.replaceAll(" ", "-") + ".pdf") }
-function exportWeekly(c) { let [bw, bh] = sizes[c.size], land = c.orientation === "landscape", w = land ? bh : bw, h = land ? bw : bh, p = new jsPDF({ unit: "mm", format: [w, h], orientation: land ? "landscape" : "portrait" }); paper(p, w, h, "blank", c.paper); PDFText(p, c.name, 15, 20, 20, [40, 40, 40], true); let ls = c.week === "sunday" ? ["SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"] : ["MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"], gx = 12, gy = 30, gw = w - 24, cw = gw / 7; ls.forEach((d, i) => { let x = gx + i * cw; p.setFillColor(246, 239, 243); p.rect(x, gy, cw, 8, "F"); PDFText(p, d, x + cw / 2, gy + 5, 6, [100, 100, 100], true, "center"); p.rect(x, gy + 8, cw, 115) }); if (c.notes) { p.roundedRect(12, h - 35, gw, 18, 2, 2); PDFText(p, "NOTES", 16, h - 29, 6, [100, 100, 100], true) } elementsPDF(p, c.elements); brand(p, w, h); p.save(c.name.replaceAll(" ", "-") + ".pdf") }
+function pdfColor(hex, fallback = [40, 40, 40]) {
+  if (!hex || typeof hex !== "string") return fallback;
+  const h = hex.replace("#", "");
+  if (h.length !== 6) return fallback;
+  return [parseInt(h.slice(0, 2), 16), parseInt(h.slice(2, 4), 16), parseInt(h.slice(4, 6), 16)];
+}
+
+function brand(p, w, h) {
+  PDFText(p, "dienix", w - 10, h - 7, 7, [120, 128, 145], false, "right");
+}
+
+function roundedFill(p, x, y, w, h, r, color) {
+  p.setFillColor(...color);
+  p.roundedRect(x, y, w, h, r, r, "F");
+}
+
+function roundedStroke(p, x, y, w, h, r, color, line = 0.25) {
+  p.setDrawColor(...color);
+  p.setLineWidth(line);
+  p.roundedRect(x, y, w, h, r, r, "S");
+}
+
+function pdfPaper(p, w, h, style, paperColor, designW, designH) {
+  const paper = pdfColor(paperColor, [255, 255, 255]);
+  p.setFillColor(...paper);
+  p.rect(0, 0, w, h, "F");
+
+  const sx = w / designW;
+  const sy = h / designH;
+  const line = [217, 222, 234];
+
+  if (style === "ruled") {
+    p.setDrawColor(...line);
+    p.setLineWidth(0.15);
+    for (let y = 86; y < designH - 48; y += 23) {
+      p.line(29 * sx, y * sy, (designW - 29) * sx, y * sy);
+    }
+  }
+
+  if (style === "grid") {
+    p.setDrawColor(...line);
+    p.setLineWidth(0.15);
+    for (let y = 86; y < designH - 48; y += 23) {
+      p.line(29 * sx, y * sy, (designW - 29) * sx, y * sy);
+    }
+    for (let x = 29; x < designW - 29; x += 23) {
+      p.line(x * sx, 86 * sy, x * sx, (designH - 48) * sy);
+    }
+  }
+
+  if (style === "dotted") {
+    p.setFillColor(200, 206, 224);
+    for (let y = 86; y < designH - 48; y += 16) {
+      for (let x = 29; x < designW - 29; x += 16) {
+        p.circle(x * sx, y * sy, 0.3, "F");
+      }
+    }
+  }
+}
+
+function pdfTop(p, w, designW, accent) {
+  p.setFillColor(...pdfColor(accent));
+  p.rect(0, 0, w, 4 * (w / designW), "F");
+}
+
+function pdfElements(p, es, designW, designH) {
+  if (!Array.isArray(es)) return;
+  const sx = p.internal.pageSize.getWidth() / designW;
+  const sy = p.internal.pageSize.getHeight() / designH;
+
+  es.forEach(e => {
+    const x = (e.x / 100) * designW * sx;
+    const y = (e.y / 100) * designH * sy;
+    const w = (e.w / 100) * designW * sx;
+    const h = (e.h / 100) * designH * sy;
+    const c = pdfColor(e.color, [70, 78, 105]);
+
+    p.setDrawColor(...c);
+    p.setTextColor(...c);
+
+    if (e.type === "text") {
+      PDFText(p, e.content || "", x, y + Math.max(4, e.size * 0.75) * sy, Math.max(6, e.size * 0.75), c, e.bold);
+    }
+
+    if (e.type === "check") {
+      p.setLineWidth(0.3);
+      p.rect(x, y, 5 * sx, 5 * sy);
+      PDFText(p, e.content || "Task", x + 8 * sx, y + 4 * sy, 8 * 0.75, c);
+    }
+
+    if (e.type === "line") {
+      p.setLineWidth(Math.max(0.2, 0.7 * sy));
+      p.line(x, y, x + w, y);
+    }
+
+    if (e.type === "box") {
+      p.setLineWidth(0.3);
+      p.roundedRect(x, y, w, h, 2 * sx, 2 * sy, "S");
+    }
+
+    if (e.type === "icon") {
+      p.circle(x + 4 * sx, y + 4 * sy, 3 * sx);
+      PDFText(p, "★", x + 4 * sx, y + 6 * sy, 6 * 0.75, c, true, "center");
+    }
+  });
+}
+
+function pdfNotebookPage(p, c, sectionName, sectionIndex, pageNumber) {
+  const w = p.internal.pageSize.getWidth();
+  const h = p.internal.pageSize.getHeight();
+  const designW = 355;
+  const designH = 505;
+  const sx = w / designW;
+  const sy = h / designH;
+  const accent = pdfColor(c.accent);
+  const ink = [51, 58, 97];
+  const muted = [174, 182, 205];
+
+  pdfPaper(p, w, h, c.style, c.paper, designW, designH);
+  pdfTop(p, w, designW, c.accent);
+
+  PDFText(p, "dienix", 29 * sx, 23 * sy, 6 * 0.75, muted, false);
+  PDFText(p, sectionName || "Notebook", 29 * sx, 61 * sy, 19 * 0.75, ink, true);
+  PDFText(p, "LINKED DIGITAL NOTEBOOK", 29 * sx, 76 * sy, 5 * 0.75, muted, true);
+
+  PDFText(p, "01", (designW - 34) * sx, 57 * sy, 5 * 0.75, muted, false);
+  PDFText(p, "NOTES", (designW - 13) * sx, 57 * sy, 5 * 0.75, muted, false, "right");
+
+  if (c.tabs) {
+    const tabH = 38;
+    const tabW = 20;
+    const top = 70 + sectionIndex * 40;
+    p.setFillColor(...accent);
+    p.roundedRect((designW - tabW) * sx, top * sy, tabW * sx, tabH * sy, 2 * sx, 2 * sy, "F");
+    PDFText(p, String(sectionIndex + 1).padStart(2, "0"), (designW - 10) * sx, (top + 25) * sy, 7 * 0.75, [255, 255, 255], true, "center");
+  }
+
+  p.setTextColor(...muted);
+  PDFText(p, "INDEX", 22 * sx, (designH - 10) * sy, 6 * 0.75, muted);
+  PDFText(p, "‹", (designW * 0.52) * sx, (designH - 10) * sy, 8 * 0.75, muted, false, "center");
+  PDFText(p, "›", (designW - 22) * sx, (designH - 10) * sy, 8 * 0.75, muted, false, "center");
+  PDFText(p, "dienix", (designW - 22) * sx, (designH - 10) * sy, 6 * 0.75, muted, false, "right");
+
+  if (c.numbers) PDFText(p, String(pageNumber), designW / 2 * sx, (designH - 10) * sy, 6 * 0.75, [120, 128, 145], false, "center");
+
+  pdfElements(p, c.elements, designW, designH);
+  brand(p, w, h);
+}
+
+function exportNotebook(c) {
+  const [bw, bh] = sizes[c.size];
+  const land = c.orientation === "landscape";
+  const w = land ? bh : bw;
+  const h = land ? bw : bh;
+  const designW = 355;
+  const designH = 505;
+  const sx = w / designW;
+  const sy = h / designH;
+  const p = new jsPDF({ unit: "mm", format: [w, h], orientation: land ? "landscape" : "portrait" });
+  const totalContent = c.sections.reduce((n, s) => n + Math.max(0, Number(s[1]) || 0), 0);
+  const indexPage = c.cover ? 2 : 1;
+
+  if (c.cover) {
+    p.setFillColor(...pdfColor(c.paper, [255, 255, 255]));
+    p.rect(0, 0, w, h, "F");
+    pdfTop(p, w, designW, c.accent);
+    PDFText(p, "dienix", 29 * sx, 82 * sy, 8, [120, 128, 145]);
+    PDFText(p, c.name.toUpperCase(), 29 * sx, 250 * sy, 25 * 0.75, [51, 58, 97], true);
+    PDFText(p, "A LINKED DIGITAL NOTEBOOK FOR GOODNOTES", 29 * sx, 275 * sy, 7 * 0.75, [174, 182, 205], true);
+    brand(p, w, h);
+    p.addPage([w, h]);
+  }
+
+  // Index occupies the first page when the cover is disabled,
+  // otherwise it is page 2.
+  p.setFillColor(...pdfColor(c.paper, [255, 255, 255]));
+  p.rect(0, 0, w, h, "F");
+  pdfTop(p, w, designW, c.accent);
+  PDFText(p, "INDEX", 29 * sx, 58 * sy, 21 * 0.75, [51, 58, 97], true);
+
+  let y = 100;
+  let target = c.cover ? 3 : 2;
+
+  c.sections.forEach((section, i) => {
+    const rowH = 11;
+    roundedFill(p, 14 * sx, y * sy, (designW - 28) * sx, rowH * sy, 2, pdfColor(c.accent));
+    PDFText(p, `${i + 1}. ${section[0]}`, 20 * sx, (y + 7) * sy, 9 * 0.75, [255, 255, 255], true);
+    p.link(14 * sx, y * sy, (designW - 28) * sx, rowH * sy, { pageNumber: target });
+    y += 17;
+    target += Math.max(0, Number(section[1]) || 0);
+  });
+
+  brand(p, w, h);
+
+  let pg = c.cover ? 3 : 2;
+  const lastPage = (c.cover ? 2 : 1) + totalContent;
+
+  c.sections.forEach((section, i) => {
+    const count = Math.max(0, Number(section[1]) || 0);
+
+    for (let n = 0; n < count; n++) {
+      p.addPage([w, h]);
+      pdfNotebookPage(p, c, section[0], i, pg);
+
+      // Bottom navigation mirrors the Live Preview.
+      p.link(10 * sx, (designH - 14) * sy, 25 * sx, 8 * sy, { pageNumber: indexPage });
+
+      if (pg > (c.cover ? 3 : 2)) {
+        p.link((designW / 2 - 18) * sx, (designH - 14) * sy, 14 * sx, 8 * sy, { pageNumber: pg - 1 });
+      }
+
+      if (pg < lastPage) {
+        p.link((designW / 2 + 4) * sx, (designH - 14) * sy, 14 * sx, 8 * sy, { pageNumber: pg + 1 });
+      }
+
+      pg++;
+    }
+  });
+
+  p.save(c.name.replaceAll(" ", "-") + ".pdf");
+}
+
+function pdfAnnualPage(p, c, month) {
+  const w = p.internal.pageSize.getWidth();
+  const h = p.internal.pageSize.getHeight();
+  const designW = 625;
+  const designH = 420;
+  const sx = w / designW;
+  const sy = h / designH;
+  const accent = pdfColor(c.accent);
+  const muted = [174, 182, 205];
+
+  p.setFillColor(...pdfColor(c.paper, [255, 255, 255]));
+  p.rect(0, 0, w, h, "F");
+  pdfTop(p, w, designW, c.accent);
+
+  PDFText(p, mn(c.year, month), 25 * sx, 53 * sy, 27 * 0.75, [51, 58, 97], true);
+  PDFText(p, String(c.year), 95 * sx, 53 * sy, 8 * 0.75, muted);
+  PDFText(p, "ANNUAL PLANNER · DEMO", (designW - 26) * sx, 30 * sy, 6 * 0.75, muted, true, "right");
+  PDFText(p, "PLAN · ORGANIZE · WRITE · REVIEW", 25 * sx, 62 * sy, 5 * 0.75, muted, true);
+
+  const days = c.week === "sunday"
+    ? ["SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"]
+    : ["MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"];
+
+  const gx = 25, gy = 78, gw = designW - 50, gh = designH - 126;
+  const cw = gw / 7, ch = gh / 6;
+
+  p.setDrawColor(217, 222, 234);
+  p.setLineWidth(0.2);
+
+  days.forEach((d, i) => {
+    p.setFillColor(...accent);
+    p.rect((gx + i * cw) * sx, gy * sy, cw * sx, 25 * sy, "F");
+    PDFText(p, d, (gx + i * cw + cw / 2) * sx, (gy + 16) * sy, 6 * 0.75, [255, 255, 255], true, "center");
+  });
+
+  const o = off(c.year, month, c.week);
+  const totalDays = md(c.year, month);
+
+  for (let r = 0; r < 6; r++) {
+    for (let col = 0; col < 7; col++) {
+      const x = gx + col * cw;
+      const y = gy + 25 + r * ch;
+      p.setFillColor(...pdfColor(c.paper, [255, 255, 255]));
+      p.rect(x * sx, y * sy, cw * sx, ch * sy, "F");
+      p.setDrawColor(217, 222, 234);
+      p.rect(x * sx, y * sy, cw * sx, ch * sy, "S");
+
+      const index = r * 7 + col;
+      const d = index - o + 1;
+      if (d > 0 && d <= totalDays) {
+        PDFText(p, String(d), (x + 7) * sx, (y + 17) * sy, 7 * 0.75, [51, 58, 97], true);
+        if (c.density !== "compact") {
+          p.setDrawColor(236, 239, 246);
+          p.line((x + 7) * sx, (y + ch - 9) * sy, (x + cw - 7) * sx, (y + ch - 9) * sy);
+        }
+      }
+    }
+  }
+
+  if (c.notes) {
+    roundedStroke(p, 25 * sx, (designH - 37) * sy, (designW - 50) * sx, 20 * sy, 4, [208, 213, 228], 0.25);
+    PDFText(p, "NOTES", 32 * sx, (designH - 27) * sy, 5 * 0.75, [162, 170, 194], true);
+  }
+
+  if (c.weeknumbers) {
+    PDFText(p, "WEEK", (designW - 25) * sx, (designH - 27) * sy, 5 * 0.75, muted, true, "right");
+  }
+
+  PDFText(p, "dienix", (designW - 22) * sx, (designH - 10) * sy, 5 * 0.75, muted, false, "right");
+  pdfElements(p, c.elements, designW, designH);
+  brand(p, w, h);
+}
+
+function exportAnnual(c) {
+  const [bw, bh] = sizes[c.size];
+  const land = c.orientation === "landscape";
+  const w = land ? bh : bw;
+  const h = land ? bw : bh;
+  const p = new jsPDF({ unit: "mm", format: [w, h], orientation: land ? "landscape" : "portrait" });
+
+  p.setFillColor(...pdfColor(c.paper, [255, 255, 255]));
+  p.rect(0, 0, w, h, "F");
+  pdfTop(p, w, 625, c.accent);
+  PDFText(p, String(c.year), 25 * (w / 625), 210 * (h / 420), 34 * 0.75, [51, 58, 97], true);
+  PDFText(p, "ANNUAL PLANNER", 25 * (w / 625), 236 * (h / 420), 12 * 0.75, [120, 128, 145], true);
+  brand(p, w, h);
+
+  p.addPage([w, h]);
+  pdfAnnualPage(p, c, 0);
+
+  for (let m = 1; m < 12; m++) {
+    p.addPage([w, h]);
+    pdfAnnualPage(p, c, m);
+  }
+
+  // Rebuild page 2 as the overview after all month pages exist.
+  // jsPDF keeps the overview links valid because page numbers are fixed.
+  p.setPage(2);
+  p.setFillColor(...pdfColor(c.paper, [255, 255, 255]));
+  p.rect(0, 0, w, h, "F");
+  pdfTop(p, w, 625, c.accent);
+  PDFText(p, `${c.year} OVERVIEW`, 25 * (w / 625), 45 * (h / 420), 20 * 0.75, [51, 58, 97], true);
+
+  const sx = w / 625, sy = h / 420;
+  const cw = (625 - 70) / 3, ch = (420 - 100) / 4;
+  for (let m = 0; m < 12; m++) {
+    const x = 25 + (m % 3) * cw;
+    const y = 65 + Math.floor(m / 3) * ch;
+    roundedFill(p, x * sx, y * sy, (cw - 7) * sx, (ch - 7) * sy, 4, pdfColor(c.paper, [255, 255, 255]));
+    roundedStroke(p, x * sx, y * sy, (cw - 7) * sx, (ch - 7) * sy, 4, [217, 222, 234], 0.25);
+    p.setFillColor(...pdfColor(c.accent));
+    p.rect(x * sx, y * sy, (cw - 7) * sx, 5 * sy, "F");
+    PDFText(p, mn(c.year, m).toUpperCase(), (x + 7) * sx, (y + 18) * sy, 8 * 0.75, [51, 58, 97], true);
+    p.link(x * sx, y * sy, (cw - 7) * sx, (ch - 7) * sy, { pageNumber: m + 3 });
+  }
+  brand(p, w, h);
+
+  p.save(c.name.replaceAll(" ", "-") + "-" + c.year + ".pdf");
+}
+
+function exportTasks(c) {
+  const [bw, bh] = sizes[c.size];
+  const land = c.orientation === "landscape";
+  const w = land ? bh : bw;
+  const h = land ? bw : bh;
+  const p = new jsPDF({ unit: "mm", format: [w, h], orientation: land ? "landscape" : "portrait" });
+  const designW = 355, designH = 505, sx = w / designW, sy = h / designH;
+  const muted = [174, 182, 205];
+
+  p.setFillColor(...pdfColor(c.paper, [255, 255, 255]));
+  p.rect(0, 0, w, h, "F");
+  pdfTop(p, w, designW, c.accent);
+
+  PDFText(p, "PRODUCTIVITY · DEMO", 28 * sx, 23 * sy, 6 * 0.75, muted, true);
+  PDFText(p, c.name, 28 * sx, 50 * sy, 20 * 0.75, [51, 58, 97], true);
+  PDFText(p, "PLAN · PRIORITIZE · COMPLETE", 28 * sx, 65 * sy, 5 * 0.75, muted, true);
+
+  roundedStroke(p, (designW - 63) * sx, 31 * sy, 35 * sx, 40 * sy, 5, [217, 222, 234], 0.25);
+  PDFText(p, "01", (designW - 45.5) * sx, 54 * sy, 13 * 0.75, [51, 58, 97], true, "center");
+  PDFText(p, "MON", (designW - 45.5) * sx, 64 * sy, 5 * 0.75, muted, false, "center");
+
+  PDFText(p, "TOP PRIORITIES", 28 * sx, 96 * sy, 5 * 0.75, [162, 170, 194], true);
+  for (let i = 0; i < 3; i++) {
+    roundedStroke(p, (28 + i * 100) * sx, 101 * sy, 94 * sx, 25 * sy, 4, [217, 222, 234], 0.25);
+  }
+
+  PDFText(p, "TASK", 43 * sx, 153 * sy, 5 * 0.75, muted, true);
+  if (c.priority) PDFText(p, "PRIORITY", (designW - 50) * sx, 153 * sy, 5 * 0.75, muted, true, "center");
+  if (c.due) PDFText(p, "DUE", (designW - 17) * sx, 153 * sy, 5 * 0.75, muted, true, "center");
+
+  p.setDrawColor(217, 222, 234);
+  p.line(28 * sx, 158 * sy, (designW - 28) * sx, 158 * sy);
+
+  const rows = Math.min(Math.max(Number(c.rows) || 1, 1), 12);
+  for (let i = 0; i < rows; i++) {
+    const y = 158 + i * 23;
+    p.setDrawColor(217, 222, 234);
+    p.line(28 * sx, (y + 23) * sy, (designW - 28) * sx, (y + 23) * sy);
+    p.setDrawColor(174, 182, 205);
+    p.rect(28 * sx, (y + 7) * sy, 8 * sx, 8 * sy);
+    p.setDrawColor(217, 222, 234);
+    p.line(43 * sx, (y + 18) * sy, (designW - 60) * sx, (y + 18) * sy);
+    if (c.priority) PDFText(p, "•", (designW - 50) * sx, (y + 16) * sy, 10 * 0.75, muted, true, "center");
+    if (c.due) PDFText(p, "—", (designW - 17) * sx, (y + 16) * sy, 7 * 0.75, muted, false, "center");
+  }
+
+  const bottomY = designH - 70;
+  for (let i = 0; i < 2; i++) {
+    const x = 28 + i * 149;
+    p.setDrawColor(217, 222, 234);
+    p.line(x * sx, bottomY * sy, (x + 137) * sx, bottomY * sy);
+    PDFText(p, i === 0 ? "FOCUS" : "NOTES", x * sx, (bottomY + 10) * sy, 5 * 0.75, muted, true);
+    p.setDrawColor(238, 238, 238);
+    p.line(x * sx, (bottomY + 28) * sy, (x + 137) * sx, (bottomY + 28) * sy);
+  }
+
+  PDFText(p, "dienix", (designW - 22) * sx, (designH - 10) * sy, 5 * 0.75, muted, false, "right");
+  pdfElements(p, c.elements, designW, designH);
+  brand(p, w, h);
+  p.save(c.name.replaceAll(" ", "-") + ".pdf");
+}
+
+function exportWeekly(c) {
+  const [bw, bh] = sizes[c.size];
+  const land = c.orientation === "landscape";
+  const w = land ? bh : bw;
+  const h = land ? bw : bh;
+  const p = new jsPDF({ unit: "mm", format: [w, h], orientation: land ? "landscape" : "portrait" });
+  const designW = 650, designH = 420, sx = w / designW, sy = h / designH;
+  const muted = [174, 182, 205];
+
+  p.setFillColor(...pdfColor(c.paper, [255, 255, 255]));
+  p.rect(0, 0, w, h, "F");
+  pdfTop(p, w, designW, c.accent);
+
+  PDFText(p, "WEEKLY PLANNER · DEMO", 25 * sx, 25 * sy, 6 * 0.75, muted, true);
+  PDFText(p, c.name, 25 * sx, 52 * sy, 22 * 0.75, [51, 58, 97], true);
+  PDFText(p, "WEEKLY OVERVIEW", 25 * sx, 67 * sy, 5 * 0.75, muted, true);
+
+  PDFText(p, "WEEK", (designW - 65) * sx, 31 * sy, 5 * 0.75, muted, true);
+  PDFText(p, "01", (designW - 26) * sx, 39 * sy, 13 * 0.75, [95, 104, 128], true, "right");
+
+  const days = c.week === "sunday"
+    ? ["SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"]
+    : ["MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"];
+
+  const gx = 25, gy = 75, gw = designW - 50, colW = gw / 7, gridH = 224;
+  days.forEach((d, i) => {
+    const x = gx + i * colW;
+    p.setFillColor(...pdfColor(c.accent));
+    p.rect(x * sx, gy * sy, colW * sx, 25 * sy, "F");
+    PDFText(p, d, (x + colW / 2) * sx, (gy + 16) * sy, 6 * 0.75, [255, 255, 255], true, "center");
+    p.setDrawColor(213, 218, 231);
+    p.rect(x * sx, (gy + 25) * sy, colW * sx, gridH * sy, "S");
+    p.setDrawColor(200, 206, 224);
+    p.circle((x + 9) * sx, (gy + 64) * sy, 2 * sx, "S");
+    p.setDrawColor(236, 239, 246);
+    p.line((x + 9) * sx, (gy + 83) * sy, (x + colW - 9) * sx, (gy + 83) * sy);
+    p.line((x + 9) * sx, (gy + 103) * sy, (x + colW - 9) * sx, (gy + 103) * sy);
+  });
+
+  if (c.notes) {
+    for (let i = 0; i < 2; i++) {
+      const x = 25 + i * 305;
+      roundedStroke(p, x * sx, (designH - 75) * sy, 290 * sx, 53 * sy, 4, [217, 222, 234], 0.25);
+      PDFText(p, i === 0 ? "FOCUS" : "NOTES", (x + 7) * sx, (designH - 58) * sy, 5 * 0.75, muted, true);
+      p.setDrawColor(238, 238, 238);
+      p.line((x + 7) * sx, (designH - 39) * sy, (x + 283) * sx, (designH - 39) * sy);
+    }
+  }
+
+  PDFText(p, "dienix", (designW - 22) * sx, (designH - 10) * sy, 5 * 0.75, muted, false, "right");
+  pdfElements(p, c.elements, designW, designH);
+  brand(p, w, h);
+  p.save(c.name.replaceAll(" ", "-") + ".pdf");
+}
 
 function Element({ e }) { let s = { left: e.x + "%", top: e.y + "%", width: e.w + "%", height: e.h + "%", color: e.color, fontSize: e.size + "px" }; if (e.type === "text") return <div className={"el text " + (e.bold ? "bold" : "")} style={s}>{e.content}</div>; if (e.type === "check") return <div className="el check" style={s}><span /> {e.content}</div>; if (e.type === "line") return <div className="el line" style={{ ...s, background: e.color }} />; if (e.type === "box") return <div className="el box" style={{ ...s, borderColor: e.color }} />; return <div className="el icon" style={s}>★</div> }
 function Preview({ type, cfg, month }) {
